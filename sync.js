@@ -42,7 +42,7 @@ async function db(method, path, token, body) {
     } catch (e) { total.errores.push(`${plat}: ${e.message}`); continue; }
     const { updates, stats } = planSync({ plat, text, reservas, today, hash });
     Object.assign(cambios, updates);
-    total.eventos[plat] = stats.eventos;
+    total.eventos[plat] = `${stats.eventos}, ${text.length} bytes`;
     for (const c of ['creadas', 'vinculadas', 'borradas', 'perdidas', 'avisos']) total[c] += stats[c];
     total.errores.push(...stats.errores);
   }

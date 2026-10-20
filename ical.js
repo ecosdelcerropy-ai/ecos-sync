@@ -28,11 +28,12 @@ function parseIcs(text) {
 
 /* Devuelve { updates, stats } donde updates es un mapa de rutas relativas a /reservas (null = borrar). */
 function planSync({ plat, text, reservas, today, hash }) {
-  const stats = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, eventos: 0, errores: [] };
+  const stats = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, eventos: "", errores: [] };
   const updates = {};
   if (!/BEGIN:VCALENDAR/.test(text)) { stats.errores.push(`${plat}: la respuesta no es un calendario iCal`); return { updates, stats }; }
-  const events = parseIcs(text).filter(e => e.uid && e.end >= addDays(today, -30));
-  stats.eventos = events.length;
+  const todos = parseIcs(text).map(e => ({ ...e, uid: e.uid || `${plat}-${e.start}-${e.end}` }));
+  const events = todos.filter(e => e.end >= addDays(today, -30));
+  stats.eventos = `${events.length} vigentes de ${todos.length} leídos`;
   const mine = Object.values(reservas).filter(r => r && r.plataforma === plat);
   const autoCount = mine.filter(r => r.auto && r.estado === 'bloqueada').length;
   const uids = new Set(events.map(e => e.uid));
