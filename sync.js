@@ -34,12 +34,19 @@ async function db(method, path, token, body) {
 
   for (const [plat, url] of Object.entries(cfg)) {
     if (!/^https?:\/\//.test(url || '')) continue;
-    let text;
-    try {
-      const r = await fetch(url, { headers: { 'User-Agent': 'EcosDelCerro/1.0' } });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      text = await r.text();
-    } catch (e) { total.errores.push(`${plat}: ${e.message}`); continue; }
+    let text, falla;
+    // Hasta 3 intentos con 20 s de espera máxima cada uno: evita avisos por fallos pasajeros de Booking o Airbnb.
+    for (let intento = 1; intento <= 3 && text === undefined; intento++) {
+      try {
+        const r = await fetch(url, { headers: { 'User-Agent': 'EcosDelCerro/1.0' }, signal: AbortSignal.timeout(20000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        text = await r.text();
+      } catch (e) {
+        falla = e.name === 'TimeoutError' ? 'sin respuesta en 20 s' : e.message;
+        if (intento < 3) await new Promise(res => setTimeout(res, 4000 * intento));
+      }
+    }
+    if (text === undefined) { total.errores.push(`${plat}: ${falla}`); continue; }
     const { updates, stats } = planSync({ plat, text, reservas, today, hash });
     Object.assign(cambios, updates);
     total.eventos[plat] = `${stats.eventos}, ${text.length} bytes`;
