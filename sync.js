@@ -29,7 +29,7 @@ async function db(method, path, token, body) {
   const cfg = (await db('GET', '/config/ical', token)) || {};
   const reservas = (await db('GET', '/reservas', token)) || {};
   const today = iso(new Date());
-  const total = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, eventos: {}, errores: [] };
+  const total = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, canceladas: 0, eventos: {}, errores: [] };
   const cambios = {};
 
   for (const [plat, url] of Object.entries(cfg)) {
@@ -50,7 +50,7 @@ async function db(method, path, token, body) {
     const { updates, stats } = planSync({ plat, text, reservas, today, hash });
     Object.assign(cambios, updates);
     total.eventos[plat] = `${stats.eventos}, ${text.length} bytes`;
-    for (const c of ['creadas', 'vinculadas', 'borradas', 'perdidas', 'avisos']) total[c] += stats[c];
+    for (const c of ['creadas', 'vinculadas', 'borradas', 'perdidas', 'avisos', 'canceladas']) total[c] += stats[c];
     total.errores.push(...stats.errores);
   }
 

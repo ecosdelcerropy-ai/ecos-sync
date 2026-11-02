@@ -28,7 +28,7 @@ function parseIcs(text) {
 
 /* Devuelve { updates, stats } donde updates es un mapa de rutas relativas a /reservas (null = borrar). */
 function planSync({ plat, text, reservas, today, hash }) {
-  const stats = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, eventos: "", errores: [] };
+  const stats = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, canceladas: 0, eventos: "", errores: [] };
   const updates = {};
   if (!/BEGIN:VCALENDAR/.test(text)) { stats.errores.push(`${plat}: la respuesta no es un calendario iCal`); return { updates, stats }; }
   const todos = parseIcs(text).map(e => ({ ...e, uid: e.uid || `${plat}-${e.start}-${e.end}` }));
@@ -65,9 +65,17 @@ function planSync({ plat, text, reservas, today, hash }) {
   const vacio = events.length === 0 && autoCount > 3;
   if (vacio) stats.errores.push(`${plat}: el calendario vino sin eventos; no se borró nada por seguridad`);
   else for (const r of mine) {
-    if (!r.icalUid || uids.has(r.icalUid) || r.checkout < today) continue;
+    if (!r.icalUid || uids.has(r.icalUid) || r.checkout < today || r.estado === 'cancelada') continue;
     if (r.auto && r.estado === 'bloqueada') { updates[r.id] = null; stats.borradas++; }
-    else if (!r.icalMissing) { updates[`${r.id}/icalMissing`] = true; stats.perdidas++; }
+    else if (events.length === 0) continue;   // un calendario vacío puede ser un fallo de la plataforma: no se cancela nada
+    else if (r.icalMissing) {
+      // desapareció en dos revisiones seguidas (~30 min): la reserva se canceló o se movió en la plataforma
+      updates[`${r.id}/estado`] = 'cancelada'; updates[`${r.id}/icalMissing`] = null;
+      updates[`${r.id}/notas`] = ((r.notas || '') + `
+Cancelada en ${plat}: dejó de aparecer en su calendario (${today}).`).trim();
+      stats.canceladas++;
+    }
+    else { updates[`${r.id}/icalMissing`] = true; stats.perdidas++; }
   }
   return { updates, stats };
 }
