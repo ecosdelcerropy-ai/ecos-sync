@@ -1,6 +1,6 @@
 'use strict';
-/* Genera docs/directas.ics con las reservas directas (Instagram, WhatsApp) para que Booking y Airbnb las importen
-   y bloqueen esas fechas. Solo publica fechas ("Reservado"): nunca nombres, teléfonos ni montos. */
+/* Genera docs/directas.ics con las reservas directas (Instagram, WhatsApp) y las fechas cerradas desde la app,
+   para que Booking y Airbnb las importen y bloqueen esas fechas. Solo publica fechas ("Reservado"): nunca nombres, teléfonos ni montos. */
 const fs = require('fs');
 const { addDays, iso } = require('./ical');
 
@@ -9,11 +9,12 @@ const DIRECTAS = ['Instagram', 'Whatsapp'];
 function buildIcs(reservas, today) {
   const d8 = s => s.replace(/-/g, '');
   const evs = Object.values(reservas || {})
-    .filter(r => r && DIRECTAS.includes(r.plataforma) && (r.estado === 'confirmada' || r.estado === 'pendiente')
+    // reservas directas vigentes y fechas cerradas desde la app (plataforma 'Cierre')
+    .filter(r => r && ((DIRECTAS.includes(r.plataforma) && (r.estado === 'confirmada' || r.estado === 'pendiente')) || (r.plataforma === 'Cierre' && r.estado === 'bloqueada'))
       && r.checkin && r.checkout > r.checkin && r.checkout >= addDays(today, -30))
     .sort((a, b) => (a.checkin + a.id).localeCompare(b.checkin + b.id));
   const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ecos del Cerro//Reservas directas//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Ecos del Cerro - reservas directas'];
-  for (const r of evs) L.push('BEGIN:VEVENT', `UID:${r.id}@ecosdelcerro`, 'DTSTAMP:20260101T000000Z', `DTSTART;VALUE=DATE:${d8(r.checkin)}`, `DTEND;VALUE=DATE:${d8(r.checkout)}`, 'SUMMARY:Reservado', 'TRANSP:OPAQUE', 'END:VEVENT');
+  for (const r of evs) L.push('BEGIN:VEVENT', `UID:${r.id}@ecosdelcerro`, 'DTSTAMP:20260101T000000Z', `DTSTART;VALUE=DATE:${d8(r.checkin)}`, `DTEND;VALUE=DATE:${d8(r.checkout)}`, r.plataforma === 'Cierre' ? 'SUMMARY:Cerrado' : 'SUMMARY:Reservado', 'TRANSP:OPAQUE', 'END:VEVENT');
   L.push('END:VCALENDAR');
   return L.join('\r\n') + '\r\n';
 }
