@@ -28,7 +28,7 @@ jobs:
           node-version: 22
       - name: Importar calendarios (Booking, Airbnb)
         run: node sync.js
-      - name: Publicar calendario de reservas directas
+      - name: Publicar calendario de reservas directas y disponibilidad
         if: ${{ !cancelled() }}
         run: node export.js
       - name: Guardar cambios del calendario
@@ -38,5 +38,5 @@ jobs:
           git config user.email "ecos-sync@users.noreply.github.com"
           # Marca semanal: evita que GitHub pause el flujo por inactividad (repositorios públicos)
           mkdir -p docs && date -u +%G-W%V > docs/semana.txt
-          git add docs/directas.ics docs/semana.txt
-          if git diff --cached --quiet; then echo "Sin cambios en el calendario"; else git commit -m "Actualizar calendario de reservas directas" && git push; fi
+          git add docs/directas.ics docs/disponibilidad.json docs/semana.txt
+          if git diff --cached --quiet; then echo "Sin cambios en el calendario"; else git commit -m "Actualizar calendario y disponibilidad" && git push; fi

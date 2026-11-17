@@ -14,3 +14,7 @@ Secrets del repositorio (Settings → Secrets and variables → Actions):
 | `BOT_PASSWORD` | Contraseña de ese usuario |
 
 Ese email también tiene que estar en la lista de las reglas de Realtime Database.
+
+Después de sincronizar, `export.js` publica (vía GitHub Pages, público, sin datos de huéspedes):
+- `docs/directas.ics`: reservas directas (Instagram/WhatsApp) y cierres manuales, para que Booking/Airbnb las importen.
+- `docs/disponibilidad.json`: **todas** las fechas ocupadas (cualquier plataforma), `{"actualizado":"YYYY-MM-DD","ocupado":[{"desde":"...","hasta":"..."}]}`, que usa la página pública de reservas (`web-reservas/`) para pintar el calendario.
