@@ -26,11 +26,12 @@ function parseIcs(text) {
   return out;
 }
 
-/* Devuelve { updates, stats } donde updates es un mapa de rutas relativas a /reservas (null = borrar). */
+/* Devuelve { updates, avisos, stats }: updates es un mapa de rutas relativas a /reservas (null = borrar);
+   avisos son los mensajes para el panel principal (se guardan en /avisos), p. ej. cuando se cancela una reserva. */
 function planSync({ plat, text, reservas, today, hash }) {
   const stats = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, canceladas: 0, eventos: "", errores: [] };
-  const updates = {};
-  if (!/BEGIN:VCALENDAR/.test(text)) { stats.errores.push(`${plat}: la respuesta no es un calendario iCal`); return { updates, stats }; }
+  const updates = {}, avisos = {};
+  if (!/BEGIN:VCALENDAR/.test(text)) { stats.errores.push(`${plat}: la respuesta no es un calendario iCal`); return { updates, avisos, stats }; }
   const todos = parseIcs(text).map(e => ({ ...e, uid: e.uid || `${plat}-${e.start}-${e.end}` }));
   const events = todos.filter(e => e.end >= addDays(today, -30));
   stats.eventos = `${events.length} vigentes de ${todos.length} leídos`;
@@ -69,15 +70,20 @@ function planSync({ plat, text, reservas, today, hash }) {
     if (r.auto && r.estado === 'bloqueada') { updates[r.id] = null; stats.borradas++; }
     else if (events.length === 0) continue;   // un calendario vacío puede ser un fallo de la plataforma: no se cancela nada
     else if (r.icalMissing) {
-      // desapareció en dos revisiones seguidas (~30 min): la reserva se canceló o se movió en la plataforma
-      updates[`${r.id}/estado`] = 'cancelada'; updates[`${r.id}/icalMissing`] = null;
-      updates[`${r.id}/notas`] = ((r.notas || '') + `
-Cancelada en ${plat}: dejó de aparecer en su calendario (${today}).`).trim();
+      // desapareció en dos revisiones seguidas (~30 min): la reserva se canceló en la plataforma.
+      // Se elimina y queda un aviso en el panel principal con sus datos, por si hay que recrearla.
+      updates[r.id] = null;
+      const aid = 'a' + hash(`${r.id}|${today}`);
+      avisos[aid] = {
+        id: aid, tipo: 'cancelacion', fecha: today, plataforma: plat, cliente: r.cliente || '', checkin: r.checkin, checkout: r.checkout,
+        total: +r.total || 0, pagado: +r.pagado || 0, telefono: r.telefono || '', notas: (r.notas || '').slice(0, 300),
+        texto: `${r.cliente || 'Una reserva'} canceló en ${plat} (${r.checkin} → ${r.checkout}). Se eliminó de la app.`
+      };
       stats.canceladas++;
     }
     else { updates[`${r.id}/icalMissing`] = true; stats.perdidas++; }
   }
-  return { updates, stats };
+  return { updates, avisos, stats };
 }
 
 module.exports = { parseIcs, planSync, addDays, iso };

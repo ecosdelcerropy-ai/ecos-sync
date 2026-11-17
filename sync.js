@@ -30,7 +30,7 @@ async function db(method, path, token, body) {
   const reservas = (await db('GET', '/reservas', token)) || {};
   const today = iso(new Date());
   const total = { creadas: 0, vinculadas: 0, borradas: 0, perdidas: 0, avisos: 0, canceladas: 0, eventos: {}, errores: [] };
-  const cambios = {};
+  const cambios = {}, avisosNuevos = {};
 
   for (const [plat, url] of Object.entries(cfg)) {
     if (!/^https?:\/\//.test(url || '')) continue;
@@ -47,13 +47,16 @@ async function db(method, path, token, body) {
       }
     }
     if (text === undefined) { total.errores.push(`${plat}: ${falla}`); continue; }
-    const { updates, stats } = planSync({ plat, text, reservas, today, hash });
+    const { updates, avisos, stats } = planSync({ plat, text, reservas, today, hash });
     Object.assign(cambios, updates);
+    Object.assign(avisosNuevos, avisos);
     total.eventos[plat] = `${stats.eventos}, ${text.length} bytes`;
     for (const c of ['creadas', 'vinculadas', 'borradas', 'perdidas', 'avisos', 'canceladas']) total[c] += stats[c];
     total.errores.push(...stats.errores);
   }
 
+  // El aviso se guarda primero: si algo falla después, la reserva sigue ahí y se reintenta en la próxima vuelta.
+  if (Object.keys(avisosNuevos).length) await db('PATCH', '/avisos', token, avisosNuevos);
   if (Object.keys(cambios).length) await db('PATCH', '/reservas', token, cambios);
   await db('PUT', '/meta/ical', token, { ultima: new Date().toISOString(), ...total, errores: total.errores.length ? total.errores : null });
   console.log(JSON.stringify({ ...total, cambios: Object.keys(cambios).length }));
